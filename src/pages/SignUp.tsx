@@ -2,6 +2,7 @@ import React from 'react';
 import { AiFillEyeInvisible, AiFillEye } from 'react-icons/ai';
 import { Link } from 'react-router';
 import OAuth from '../components/OAuth';
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 
 export default function SignUp() {
   const [showPassword, setShowPassword] = React.useState(false);
@@ -17,6 +18,17 @@ export default function SignUp() {
       [e.target.id]: e.target.value
     }));
   }
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    try {
+      const auth = getAuth();
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      console.log(user);
+    } catch (error) {
+      console.log(error);
+    }
+  }
 
   return (
     <section>
@@ -26,7 +38,7 @@ export default function SignUp() {
             <img src="https://images.unsplash.com/flagged/photo-1564767609342-620cb19b2357?q=80&w=1073&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" alt="Key" className='w-full rounded-2xl'/>
           </div>
           <div className='w-full md:w-[67%] lg:w-[40%] lg:ml-20'>
-            <form>
+            <form onSubmit={onSubmit}>
               <input className='w-full px-4 py-2 text-xl text-gray-700 bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded transition-ease-in-out duration-200 mb-6' type="text" placeholder='Full name' id='name' value={name} onChange={onChange}/>
               <input className='w-full px-4 py-2 text-xl text-gray-700 bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded transition-ease-in-out duration-200 mb-6' type="email" placeholder='Email address' id='email' value={email} onChange={onChange}/>
               <div className='relative mb-6'>

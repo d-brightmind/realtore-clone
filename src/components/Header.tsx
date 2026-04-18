@@ -4,7 +4,6 @@ export default function Header() {
     const location = useLocation();
     const navigate = useNavigate();
     function pathMatchRoute(route: string) {
-        console.log(location.pathname);
         if (route === location.pathname) {
         return true;
         }

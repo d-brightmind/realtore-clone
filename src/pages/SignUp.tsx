@@ -2,8 +2,9 @@ import React from 'react';
 import { AiFillEyeInvisible, AiFillEye } from 'react-icons/ai';
 import { Link } from 'react-router';
 import OAuth from '../components/OAuth';
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { db } from '../firebase';
+import { serverTimestamp, doc, setDoc } from 'firebase/firestore';
 
 export default function SignUp() {
   const [showPassword, setShowPassword] = React.useState(false);
@@ -11,6 +12,7 @@ export default function SignUp() {
     name: '',
     email: '',
     password: '',
+    timestamp: serverTimestamp(),
   });
   const { name, email, password } = formData;
   function onChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -22,13 +24,18 @@ export default function SignUp() {
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     try {
+      console.log("Writing to Firestore...");
       const auth = getAuth();
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      await updateProfile(auth.currentUser!, {
+        displayName: name,
+      });
       const user = userCredential.user;
-      console.log(user);
-      console.log(db);
+      const { password: _, ...formDataCopy } = formData;
+      await setDoc(doc(db, "users", user.uid), formDataCopy);
+      console.log("Firestore write SUCCESS");
     } catch (error) {
-      console.log(error);
+      console.error("Firestore write FAILED:", error);
     }
   }
 

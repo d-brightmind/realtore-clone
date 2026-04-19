@@ -45,7 +45,9 @@ export default function SignUp() {
         ...formDataCopy,
         timestamp: serverTimestamp(),
       });
+      toast.success("Registration successful");
       navigate("/");
+
     } catch (error) {
       toast.error("Something went wrong with registration");
     }

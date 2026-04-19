@@ -4,7 +4,9 @@ import { Link } from 'react-router';
 import OAuth from '../components/OAuth';
 import { getAuth, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { db } from '../firebase';
-import { serverTimestamp, doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { useNavigate } from 'react-router';
+import { toast } from 'react-toastify/unstyled';
 
 export default function SignUp() {
   const [showPassword, setShowPassword] = React.useState(false);
@@ -12,9 +14,9 @@ export default function SignUp() {
     name: '',
     email: '',
     password: '',
-    timestamp: serverTimestamp(),
   });
   const { name, email, password } = formData;
+  const navigate = useNavigate();
   function onChange(e: React.ChangeEvent<HTMLInputElement>) {
     setFormData((prevState) => ({
       ...prevState,
@@ -26,16 +28,26 @@ export default function SignUp() {
     try {
       console.log("Writing to Firestore...");
       const auth = getAuth();
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(
+        auth, 
+        email, 
+        password
+      );
       await updateProfile(auth.currentUser!, {
         displayName: name,
       });
+
       const user = userCredential.user;
       const { password: _, ...formDataCopy } = formData;
-      await setDoc(doc(db, "users", user.uid), formDataCopy);
-      console.log("Firestore write SUCCESS");
+      console.log(user);
+
+      await setDoc(doc(db, "users", user.uid), {
+        ...formDataCopy,
+        timestamp: serverTimestamp(),
+      });
+      navigate("/");
     } catch (error) {
-      console.error("Firestore write FAILED:", error);
+      toast.error("Something went wrong with registration");
     }
   }
 

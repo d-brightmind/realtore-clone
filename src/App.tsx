@@ -6,6 +6,7 @@ import Profile from "./pages/Profile";
 import ForgotPassword from "./pages/ForgotPassword";
 import Offers from "./pages/Offers";
 import Header from "./components/Header";
+import { Bounce, ToastContainer } from "react-toastify/unstyled";
 
 function App() {
   return (
@@ -21,6 +22,19 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPassword />}/>
         </Routes>
       </Router>
+      <ToastContainer
+        position="bottom-center"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick={false}
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="dark"
+        transition={Bounce}
+        />
     </>
   )
 }

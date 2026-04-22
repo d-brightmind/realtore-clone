@@ -38,7 +38,7 @@ function onChange() {
             <input type="number" id='bedrooms' value={bedrooms} onChange={onChange} min="1" max="50" required className='w-full px-4 py-2 text-xl text-gray-700 bg-white border border-gray-300 rounded transition duration-150 ease-in-out focus:text-gray-700 focus:bg-white focus:border-slate-40 text-center'/>
           </div>
           <div className=''>
-            <p className='text-xl font-semibold'>Bathrooms</p>
+            <p className='text-xl font-semibold'>Baths</p>
             <input type="number" id='bathrooms' value={bathrooms} onChange={onChange} min="1" max="50" required className='w-full px-4 py-2 text-xl text-gray-700 bg-white border border-gray-300 rounded transition duration-150 ease-in-out focus:text-gray-700 focus:bg-white focus:border-slate-40 text-center'/>
           </div>
         </div>

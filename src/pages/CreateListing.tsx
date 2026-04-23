@@ -8,6 +8,7 @@ import {
   getDownloadURL,
 } from "firebase/storage";
 import { getAuth } from "firebase/auth";
+import { v4 as uuidv4 } from "uuid";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
 import { useNavigate } from "react-router-dom";
@@ -38,7 +39,7 @@ interface FormData {
 export default function CreateListing() {
   const navigate = useNavigate();
   const auth = getAuth();
-  const [geolocationEnabled, setGeolocationEnabled] = useState<boolean>(true);
+  const [geolocationEnabled] = useState<boolean>(true);
   const [loading, setLoading] = useState<boolean>(false);
   const [formData, setFormData] = useState<FormData>({
     type: "rent",
@@ -147,7 +148,7 @@ export default function CreateListing() {
     async function storeImage(image: File): Promise<string> {
       return new Promise((resolve, reject) => {
         const storage = getStorage();
-        const filename = `${auth.currentUser!.uid}-${image.name}-${Date.now()}`;
+        const filename = `${auth.currentUser!.uid}-${image.name}-${uuidv4()}`;
         const storageRef = ref(storage, filename);
         const uploadTask = uploadBytesResumable(storageRef, image);
 
@@ -190,7 +191,7 @@ export default function CreateListing() {
     if (!imgUrls) return;
 
     // Build Firestore document
-    type FormDataCopy = Omit<FormData, "images" | "latitude" | "longitude"> & {
+type FormDataCopy = Omit<FormData, "images" | "latitude" | "longitude" | "discountedPrice"> & {
       imgUrls: string[];
       geolocation: GeolocationData;
       timestamp: ReturnType<typeof serverTimestamp>;
@@ -209,7 +210,7 @@ export default function CreateListing() {
     delete (formDataCopy as any).images;
     delete (formDataCopy as any).latitude;
     delete (formDataCopy as any).longitude;
-    if (!formDataCopy.offer) delete (formDataCopy as any).discountedPrice;
+    if (!formDataCopy.offer) delete formDataCopy.discountedPrice;
 
     const docRef = await addDoc(collection(db, "listings"), formDataCopy);
     setLoading(false);

@@ -1,9 +1,19 @@
 import { getAuth } from 'firebase/auth';
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { toast } from 'react-toastify/unstyled';
 import { updateProfile } from 'firebase/auth';
-import { doc, updateDoc } from 'firebase/firestore';
+import {
+  collection,
+  doc,
+  getDocs,
+  orderBy,
+  query,
+  updateDoc,
+  where,
+} from "firebase/firestore";
+import { useEffect } from "react";
+import ListingItem from "../components/ListingItem";
 import { db } from '../firebase';
 import { FcHome } from 'react-icons/fc';
 import { Link } from 'react-router-dom';
@@ -12,6 +22,8 @@ import { Link } from 'react-router-dom';
 export default function Profile() {
   const auth = getAuth();
   const navigate = useNavigate();
+  const [listings, setListings] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [changeDetails, setChangeDetails] = React.useState(false);
   const [formData, setFormData] = React.useState({
     name: auth.currentUser?.displayName || 'Ridwan',
@@ -48,7 +60,31 @@ export default function Profile() {
       toast.error("Could not update profile details");
     }
   }
+useEffect(() => {
+    async function fetchUserListings() {
+      const listingRef = collection(db, "listings");
+      const q = query(
+        listingRef,
+        where("userRef", "==", auth.currentUser!.uid),
+        orderBy("timestamp", "desc")
+      );
+      const querySnap = await getDocs(q);
 
+      const listings: { id: string; data: Listing }[] = [];
+
+      querySnap.forEach((doc) => {
+        listings.push({
+          id: doc.id,
+          data: doc.data() as Listing,
+        });
+      });
+
+      setListings(listings);
+      setLoading(false);
+    }
+    fetchUserListings();
+  }, [auth.currentUser!.uid]);
+  
   return (
     <>
       <section className="max-w-6xl mx-auto flex justify-center items-center flex-col">

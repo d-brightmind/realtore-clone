@@ -1,4 +1,4 @@
-import { collection, getDocs, limit, orderBy, query } from "firebase/firestore";
+import { collection, getDocs, limit, orderBy, query, Timestamp } from "firebase/firestore";
 import { useState, useEffect } from "react";
 import Spinner from "../components/Spinner";
 import { db } from "../firebase";
@@ -13,7 +13,7 @@ interface ListingData {
   imgUrls: string[];
   regularPrice: number;
   discountedPrice?: number;
-  timestamp: any;
+  timestamp: Timestamp;
 }
 
 interface ListingWithId {
@@ -27,22 +27,20 @@ export default function Slider() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    async function fetchListings() {
+    async function fetchListings(): Promise<void> {
       const listingsRef = collection(db, "listings");
       const q = query(listingsRef, orderBy("timestamp", "desc"), limit(5));
       const querySnap = await getDocs(q);
 
-      const listings: ListingWithId[] = [];
-      querySnap.forEach((doc) => {
-        listings.push({
-          id: doc.id,
-          data: doc.data() as ListingData,
-        });
-      });
+      const fetched: ListingWithId[] = querySnap.docs.map((doc) => ({
+        id: doc.id,
+        data: doc.data() as ListingData,
+      }));
 
-      setListings(listings);
+      setListings(fetched);
       setLoading(false);
     }
+
     fetchListings();
   }, []);
 
@@ -69,12 +67,12 @@ export default function Slider() {
               backgroundSize: "cover",
             }}
             className="relative w-full h-75 overflow-hidden"
-          ></div>
+          />
           <p className="text-[#f1faee] absolute left-1 top-3 font-medium max-w-[90%] bg-[#457b9d] shadow-lg opacity-90 p-2 rounded-br-3xl">
             {data.name}
           </p>
           <p className="text-[#f1faee] absolute left-1 bottom-1 font-semibold max-w-[90%] bg-[#e63946] shadow-lg opacity-90 p-2 rounded-tr-3xl">
-            ${data.discountedPrice ?? data.regularPrice}
+            ${(data.discountedPrice ?? data.regularPrice).toLocaleString("en-US")}
             {data.type === "rent" && " / month"}
           </p>
         </SwiperSlide>

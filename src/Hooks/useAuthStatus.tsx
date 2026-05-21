@@ -1,4 +1,5 @@
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { useState, useEffect } from 'react';
 
 interface AuthStatus {
   loggedIn: boolean;
@@ -6,17 +7,18 @@ interface AuthStatus {
 }
 
 export function useAuthStatus(): AuthStatus {
-  let loggedIn = false;
-  let checkingStatus = true;
+  const [loggedIn, setLoggedIn] = useState<boolean>(false);
+  const [checkingStatus, setCheckingStatus] = useState<boolean>(true);
 
-  const auth = getAuth();
+  useEffect(() => {
+    const auth = getAuth();
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setLoggedIn(!!user);
+      setCheckingStatus(false);
+    });
 
-  onAuthStateChanged(auth, (user) => {
-    if (user) {
-      loggedIn = true;
-    }
-    checkingStatus = false;
-  });
+    return () => unsubscribe();
+  }, []);
 
   return { loggedIn, checkingStatus };
 }

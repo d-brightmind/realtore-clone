@@ -8,11 +8,9 @@ import {
   query,
   startAfter,
   where,
+  Timestamp,
 } from "firebase/firestore";
-import type {
-  DocumentData,
-  QueryDocumentSnapshot,
-} from "firebase/firestore";
+import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
 import Spinner from "../components/Spinner";
 import ListingItem from "../components/ListingItem";
@@ -31,7 +29,7 @@ interface ListingData {
   furnished: boolean;
   imgUrls: string[];
   userRef: string;
-  timestamp: any;
+  timestamp: Timestamp;
 }
 
 interface ListingWithId {
@@ -47,7 +45,7 @@ export default function Category() {
   const params = useParams<{ categoryName: string }>();
 
   useEffect(() => {
-    async function fetchListings() {
+    async function fetchListings(): Promise<void> {
       try {
         const listingRef = collection(db, "listings");
         const q = query(
@@ -57,26 +55,22 @@ export default function Category() {
           limit(8)
         );
         const querySnap = await getDocs(q);
-        const lastVisible = querySnap.docs[querySnap.docs.length - 1];
-        setLastFetchedListing(lastVisible ?? null);
 
-        const listings: ListingWithId[] = [];
-        querySnap.forEach((doc) => {
-          listings.push({
-            id: doc.id,
-            data: doc.data() as ListingData,
-          });
-        });
-        setListings(listings);
+        setLastFetchedListing(querySnap.docs.at(-1) ?? null);
+        setListings(querySnap.docs.map((doc) => ({
+          id: doc.id,
+          data: doc.data() as ListingData,
+        })));
         setLoading(false);
       } catch (error) {
         toast.error("Could not fetch listings");
       }
     }
+
     fetchListings();
   }, [params.categoryName]);
 
-  async function onFetchMoreListings() {
+  async function onFetchMoreListings(): Promise<void> {
     try {
       const listingRef = collection(db, "listings");
       const q = query(
@@ -87,17 +81,15 @@ export default function Category() {
         limit(4)
       );
       const querySnap = await getDocs(q);
-      const lastVisible = querySnap.docs[querySnap.docs.length - 1];
-      setLastFetchedListing(lastVisible ?? null);
 
-      const newListings: ListingWithId[] = [];
-      querySnap.forEach((doc) => {
-        newListings.push({
+      setLastFetchedListing(querySnap.docs.at(-1) ?? null);
+      setListings((prev) => [
+        ...prev,
+        ...querySnap.docs.map((doc) => ({
           id: doc.id,
           data: doc.data() as ListingData,
-        });
-      });
-      setListings((prevState) => [...prevState, ...newListings]);
+        })),
+      ]);
       setLoading(false);
     } catch (error) {
       toast.error("Could not fetch listings");
@@ -107,11 +99,11 @@ export default function Category() {
   return (
     <div className="max-w-6xl mx-auto px-3">
       <h1 className="text-3xl text-center mt-6 font-bold mb-6">
-        {params.categoryName === "rent" ? "Places for rent" : "Places for sale"}
+        {params.categoryName === "rent" ? "Places for Rent" : "Places for Sale"}
       </h1>
       {loading ? (
         <Spinner />
-      ) : listings && listings.length > 0 ? (
+      ) : listings.length > 0 ? (
         <>
           <main>
             <ul className="sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
@@ -138,9 +130,7 @@ export default function Category() {
       ) : (
         <p>
           There are no current{" "}
-          {params.categoryName === "rent"
-            ? "places for rent"
-            : "places for sale"}
+          {params.categoryName === "rent" ? "places for rent" : "places for sale"}
         </p>
       )}
     </div>

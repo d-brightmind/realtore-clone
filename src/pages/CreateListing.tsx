@@ -13,7 +13,6 @@ import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
 import { useNavigate } from "react-router-dom";
 
-// Types
 interface GeolocationData {
   lat: number;
   lng: number;
@@ -34,6 +33,24 @@ interface FormData {
   latitude: number;
   longitude: number;
   images: FileList | null;
+}
+
+interface ListingDocument {
+  type: "rent" | "sale";
+  name: string;
+  bedrooms: number;
+  bathrooms: number;
+  parking: boolean;
+  furnished: boolean;
+  address: string;
+  description: string;
+  offer: boolean;
+  regularPrice: number;
+  discountedPrice?: number;
+  imgUrls: string[];
+  geolocation: GeolocationData;
+  timestamp: ReturnType<typeof serverTimestamp>;
+  userRef: string;
 }
 
 export default function CreateListing() {
@@ -59,69 +76,72 @@ export default function CreateListing() {
   });
 
   const {
-    type,
-    name,
-    bedrooms,
-    bathrooms,
-    parking,
-    address,
-    furnished,
-    description,
-    offer,
-    regularPrice,
-    discountedPrice,
-    latitude,
-    longitude,
-    images,
+    type, name, bedrooms, bathrooms, parking, address,
+    furnished, description, offer, regularPrice,
+    discountedPrice, latitude, longitude, images,
   } = formData;
 
-  function onChange(
-    e:
-      | React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-      | React.MouseEvent<HTMLButtonElement>
-  ) {
-    const target = e.target as HTMLInputElement;
+  function onChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
+    const target = e.currentTarget;
 
-    // Handle booleans
-    let boolean: boolean | null = null;
-    if (target.value === "true") boolean = true;
-    if (target.value === "false") boolean = false;
-
-    // Handle files
-    if (target.files) {
-      setFormData((prevState) => ({
-        ...prevState,
-        images: target.files,
-      }));
+    if (target instanceof HTMLInputElement && target.files) {
+      setFormData((prev) => ({ ...prev, images: target.files }));
       return;
     }
 
-    // Handle text/boolean/number
-    setFormData((prevState) => ({
-      ...prevState,
-      [target.id]: boolean ?? target.value,
-    }));
+    const value =
+      target.value === "true" ? true
+      : target.value === "false" ? false
+      : target.value;
+
+    setFormData((prev) => ({ ...prev, [target.id]: value }));
   }
 
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+  function onButtonClick(e: React.MouseEvent<HTMLButtonElement>) {
+    const { id, value } = e.currentTarget;
+    const parsed =
+      value === "true" ? true
+      : value === "false" ? false
+      : value;
+
+    setFormData((prev) => ({ ...prev, [id]: parsed }));
+  }
+
+  async function storeImage(image: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const storage = getStorage();
+      const filename = `${auth.currentUser!.uid}-${image.name}-${uuidv4()}`;
+      const storageRef = ref(storage, filename);
+      const uploadTask = uploadBytesResumable(storageRef, image);
+
+      uploadTask.on(
+        "state_changed",
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          console.log(`Upload is ${progress.toFixed(1)}% done`);
+        },
+        reject,
+        () => getDownloadURL(uploadTask.snapshot.ref).then(resolve)
+      );
+    });
+  }
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
     setLoading(true);
 
-    // Validate discounted price
-    if (offer && +discountedPrice >= +regularPrice) {
+    if (offer && discountedPrice >= regularPrice) {
       setLoading(false);
       toast.error("Discounted price needs to be less than regular price");
       return;
     }
 
-    // Validate images
     if (!images || images.length > 6) {
       setLoading(false);
       toast.error("Maximum 6 images are allowed");
       return;
     }
 
-    // Geolocation
     let geolocation: GeolocationData = { lat: 0, lng: 0 };
 
     if (geolocationEnabled) {
@@ -129,7 +149,6 @@ export default function CreateListing() {
         `https://maps.googleapis.com/maps/api/geocode/json?address=${address}&key=${import.meta.env.VITE_GEOCODE_API_KEY}`
       );
       const data = await response.json();
-      console.log(data);
 
       geolocation.lat = data.results[0]?.geometry.location.lat ?? 0;
       geolocation.lng = data.results[0]?.geometry.location.lng ?? 0;
@@ -140,43 +159,7 @@ export default function CreateListing() {
         return;
       }
     } else {
-      geolocation.lat = latitude;
-      geolocation.lng = longitude;
-    }
-
-    // Upload images to Firebase Storage
-    async function storeImage(image: File): Promise<string> {
-      return new Promise((resolve, reject) => {
-        const storage = getStorage();
-        const filename = `${auth.currentUser!.uid}-${image.name}-${uuidv4()}`;
-        const storageRef = ref(storage, filename);
-        const uploadTask = uploadBytesResumable(storageRef, image);
-
-        uploadTask.on(
-          "state_changed",
-          (snapshot) => {
-            const progress =
-              (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-            console.log(`Upload is ${progress}% done`);
-            switch (snapshot.state) {
-              case "paused":
-                console.log("Upload is paused");
-                break;
-              case "running":
-                console.log("Upload is running");
-                break;
-            }
-          },
-          (error) => {
-            reject(error);
-          },
-          () => {
-            getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
-              resolve(downloadURL);
-            });
-          }
-        );
-      });
+      geolocation = { lat: latitude, lng: longitude };
     }
 
     const imgUrls = await Promise.all(
@@ -190,37 +173,31 @@ export default function CreateListing() {
 
     if (!imgUrls) return;
 
-    // Build Firestore document
-type FormDataCopy = Omit<FormData, "images" | "latitude" | "longitude" | "discountedPrice"> & {
-      imgUrls: string[];
-      geolocation: GeolocationData;
-      timestamp: ReturnType<typeof serverTimestamp>;
-      userRef: string;
-      discountedPrice?: number;
-    };
-
-    const formDataCopy: FormDataCopy = {
-      ...formData,
+    const listing: ListingDocument = {
+      type,
+      name,
+      bedrooms,
+      bathrooms,
+      parking,
+      furnished,
+      address,
+      description,
+      offer,
+      regularPrice,
+      ...(offer && { discountedPrice }),
       imgUrls,
       geolocation,
       timestamp: serverTimestamp(),
       userRef: auth.currentUser!.uid,
     };
 
-    delete (formDataCopy as any).images;
-    delete (formDataCopy as any).latitude;
-    delete (formDataCopy as any).longitude;
-    if (!formDataCopy.offer) delete formDataCopy.discountedPrice;
-
-    const docRef = await addDoc(collection(db, "listings"), formDataCopy);
+    const docRef = await addDoc(collection(db, "listings"), listing);
     setLoading(false);
     toast.success("Listing created");
-    navigate(`/category/${formDataCopy.type}/${docRef.id}`);
+    navigate(`/category/${listing.type}/${docRef.id}`);
   }
 
-  if (loading) {
-    return <Spinner />;
-  }
+  if (loading) return <Spinner />;
 
   return (
     <main className="max-w-md px-2 mx-auto">
@@ -232,7 +209,7 @@ type FormDataCopy = Omit<FormData, "images" | "latitude" | "longitude" | "discou
             type="button"
             id="type"
             value="sale"
-            onClick={onChange}
+            onClick={onButtonClick}
             className={`mr-3 px-7 py-3 font-medium text-sm uppercase shadow-md rounded hover:shadow-lg focus:shadow-lg active:shadow-lg transition duration-150 ease-in-out w-full ${
               type === "rent" ? "bg-white text-black" : "bg-slate-600 text-white"
             }`}
@@ -243,7 +220,7 @@ type FormDataCopy = Omit<FormData, "images" | "latitude" | "longitude" | "discou
             type="button"
             id="type"
             value="rent"
-            onClick={onChange}
+            onClick={onButtonClick}
             className={`ml-3 px-7 py-3 font-medium text-sm uppercase shadow-md rounded hover:shadow-lg focus:shadow-lg active:shadow-lg transition duration-150 ease-in-out w-full ${
               type === "sale" ? "bg-white text-black" : "bg-slate-600 text-white"
             }`}
@@ -297,7 +274,7 @@ type FormDataCopy = Omit<FormData, "images" | "latitude" | "longitude" | "discou
             type="button"
             id="parking"
             value="true"
-            onClick={onChange}
+            onClick={onButtonClick}
             className={`mr-3 px-7 py-3 font-medium text-sm uppercase shadow-md rounded hover:shadow-lg focus:shadow-lg active:shadow-lg transition duration-150 ease-in-out w-full ${
               parking ? "bg-slate-600 text-white" : "bg-white text-black"
             }`}
@@ -308,7 +285,7 @@ type FormDataCopy = Omit<FormData, "images" | "latitude" | "longitude" | "discou
             type="button"
             id="parking"
             value="false"
-            onClick={onChange}
+            onClick={onButtonClick}
             className={`ml-3 px-7 py-3 font-medium text-sm uppercase shadow-md rounded hover:shadow-lg focus:shadow-lg active:shadow-lg transition duration-150 ease-in-out w-full ${
               !parking ? "bg-slate-600 text-white" : "bg-white text-black"
             }`}
@@ -322,7 +299,7 @@ type FormDataCopy = Omit<FormData, "images" | "latitude" | "longitude" | "discou
             type="button"
             id="furnished"
             value="true"
-            onClick={onChange}
+            onClick={onButtonClick}
             className={`mr-3 px-7 py-3 font-medium text-sm uppercase shadow-md rounded hover:shadow-lg focus:shadow-lg active:shadow-lg transition duration-150 ease-in-out w-full ${
               furnished ? "bg-slate-600 text-white" : "bg-white text-black"
             }`}
@@ -333,7 +310,7 @@ type FormDataCopy = Omit<FormData, "images" | "latitude" | "longitude" | "discou
             type="button"
             id="furnished"
             value="false"
-            onClick={onChange}
+            onClick={onButtonClick}
             className={`ml-3 px-7 py-3 font-medium text-sm uppercase shadow-md rounded hover:shadow-lg focus:shadow-lg active:shadow-lg transition duration-150 ease-in-out w-full ${
               !furnished ? "bg-slate-600 text-white" : "bg-white text-black"
             }`}
@@ -395,7 +372,7 @@ type FormDataCopy = Omit<FormData, "images" | "latitude" | "longitude" | "discou
             type="button"
             id="offer"
             value="true"
-            onClick={onChange}
+            onClick={onButtonClick}
             className={`mr-3 px-7 py-3 font-medium text-sm uppercase shadow-md rounded hover:shadow-lg focus:shadow-lg active:shadow-lg transition duration-150 ease-in-out w-full ${
               offer ? "bg-slate-600 text-white" : "bg-white text-black"
             }`}
@@ -406,7 +383,7 @@ type FormDataCopy = Omit<FormData, "images" | "latitude" | "longitude" | "discou
             type="button"
             id="offer"
             value="false"
-            onClick={onChange}
+            onClick={onButtonClick}
             className={`ml-3 px-7 py-3 font-medium text-sm uppercase shadow-md rounded hover:shadow-lg focus:shadow-lg active:shadow-lg transition duration-150 ease-in-out w-full ${
               !offer ? "bg-slate-600 text-white" : "bg-white text-black"
             }`}
@@ -458,9 +435,7 @@ type FormDataCopy = Omit<FormData, "images" | "latitude" | "longitude" | "discou
         )}
         <div className="mb-6">
           <p className="text-lg font-semibold">Images</p>
-          <p className="text-gray-600">
-            The first image will be the cover (max 6)
-          </p>
+          <p className="text-gray-600">The first image will be the cover (max 6)</p>
           <input
             type="file"
             id="images"

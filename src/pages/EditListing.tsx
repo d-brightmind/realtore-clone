@@ -13,11 +13,12 @@ import {
   getDoc,
   serverTimestamp,
   updateDoc,
+  Timestamp,
 } from "firebase/firestore";
+import type { WithFieldValue } from "firebase/firestore";
 import { db } from "../firebase";
 import { useNavigate, useParams } from "react-router-dom";
 
-// Types
 interface GeolocationData {
   lat: number;
   lng: number;
@@ -40,12 +41,42 @@ interface FormData {
   images: FileList | null;
 }
 
-interface ListingData extends Omit<FormData, "images" | "latitude" | "longitude" | "discountedPrice"> {
+interface StoredListing {
+  type: "rent" | "sale";
+  name: string;
+  bedrooms: number;
+  bathrooms: number;
+  parking: boolean;
+  furnished: boolean;
+  address: string;
+  description: string;
+  offer: boolean;
+  regularPrice: number;
+  discountedPrice?: number;
+  latitude: number;
+  longitude: number;
+  imgUrls: string[];
+  geolocation: GeolocationData;
+  timestamp: Timestamp;
+  userRef: string;
+}
+
+interface ListingDocument {
+  type: "rent" | "sale";
+  name: string;
+  bedrooms: number;
+  bathrooms: number;
+  parking: boolean;
+  furnished: boolean;
+  address: string;
+  description: string;
+  offer: boolean;
+  regularPrice: number;
+  discountedPrice?: number;
   imgUrls: string[];
   geolocation: GeolocationData;
   timestamp: ReturnType<typeof serverTimestamp>;
   userRef: string;
-  discountedPrice?: number; // ✅ optional here, overrides the required one from FormData
 }
 
 export default function EditListing() {
@@ -54,7 +85,7 @@ export default function EditListing() {
   const params = useParams<{ listingId: string }>();
   const geolocationEnabled = false;
   const [loading, setLoading] = useState<boolean>(false);
-  const [listing, setListing] = useState<Partial<FormData> | null>(null);
+  const [listing, setListing] = useState<StoredListing | null>(null);
   const [formData, setFormData] = useState<FormData>({
     type: "rent",
     name: "",
@@ -78,24 +109,37 @@ export default function EditListing() {
     regularPrice, discountedPrice, latitude, longitude, images,
   } = formData;
 
-  // Redirect if not owner
   useEffect(() => {
-    if (listing && (listing as any).userRef !== auth.currentUser!.uid) {
+    if (listing && listing.userRef !== auth.currentUser!.uid) {
       toast.error("You can't edit this listing");
       navigate("/");
     }
   }, [auth.currentUser, listing, navigate]);
 
-  // Fetch listing data
   useEffect(() => {
     setLoading(true);
-    async function fetchListing() {
+    async function fetchListing(): Promise<void> {
       const docRef = doc(db, "listings", params.listingId!);
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
-        const data = docSnap.data() as FormData;
+        const data = docSnap.data() as StoredListing;
         setListing(data);
-        setFormData({ ...data, images: null }); // ✅ images from Firestore are URLs not files
+        setFormData({
+          type: data.type,
+          name: data.name,
+          bedrooms: data.bedrooms,
+          bathrooms: data.bathrooms,
+          parking: data.parking,
+          furnished: data.furnished,
+          address: data.address,
+          description: data.description,
+          offer: data.offer,
+          regularPrice: data.regularPrice,
+          discountedPrice: data.discountedPrice ?? 0,
+          latitude: data.latitude,
+          longitude: data.longitude,
+          images: null,
+        });
         setLoading(false);
       } else {
         navigate("/");
@@ -105,53 +149,67 @@ export default function EditListing() {
     fetchListing();
   }, [navigate, params.listingId]);
 
-  function onChange(
-    e:
-      | React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-      | React.MouseEvent<HTMLButtonElement>
-  ) {
-    const target = e.target as HTMLInputElement;
+  function onChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
+    const target = e.currentTarget;
 
-    // Handle booleans
-    let boolean: boolean | null = null;
-    if (target.value === "true") boolean = true;
-    if (target.value === "false") boolean = false;
-
-    // Handle files
-    if (target.files) {
-      setFormData((prevState) => ({
-        ...prevState,
-        images: target.files,
-      }));
+    if (target instanceof HTMLInputElement && target.files) {
+      setFormData((prev) => ({ ...prev, images: target.files }));
       return;
     }
 
-    // Handle text/boolean/number
-    setFormData((prevState) => ({
-      ...prevState,
-      [target.id]: boolean ?? target.value,
-    }));
+    const value =
+      target.value === "true" ? true
+      : target.value === "false" ? false
+      : target.value;
+
+    setFormData((prev) => ({ ...prev, [target.id]: value }));
   }
 
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+  function onButtonClick(e: React.MouseEvent<HTMLButtonElement>) {
+    const { id, value } = e.currentTarget;
+    const parsed =
+      value === "true" ? true
+      : value === "false" ? false
+      : value;
+
+    setFormData((prev) => ({ ...prev, [id]: parsed }));
+  }
+
+  async function storeImage(image: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const storage = getStorage();
+      const filename = `${auth.currentUser!.uid}-${image.name}-${crypto.randomUUID()}`;
+      const storageRef = ref(storage, filename);
+      const uploadTask = uploadBytesResumable(storageRef, image);
+
+      uploadTask.on(
+        "state_changed",
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          console.log(`Upload is ${progress.toFixed(1)}% done`);
+        },
+        reject,
+        () => getDownloadURL(uploadTask.snapshot.ref).then(resolve)
+      );
+    });
+  }
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
     setLoading(true);
 
-    // Validate discounted price
-    if (offer && +discountedPrice >= +regularPrice) {
+    if (offer && discountedPrice >= regularPrice) {
       setLoading(false);
       toast.error("Discounted price needs to be less than regular price");
       return;
     }
 
-    // Validate images
     if (images && images.length > 6) {
       setLoading(false);
       toast.error("Maximum 6 images are allowed");
       return;
     }
 
-    // Geolocation
     let geolocation: GeolocationData = { lat: 0, lng: 0 };
 
     if (geolocationEnabled) {
@@ -169,37 +227,10 @@ export default function EditListing() {
         return;
       }
     } else {
-      geolocation.lat = latitude;
-      geolocation.lng = longitude;
+      geolocation = { lat: latitude, lng: longitude };
     }
 
-    // Upload images
-    async function storeImage(image: File): Promise<string> {
-      return new Promise((resolve, reject) => {
-        const storage = getStorage();
-        const filename = `${auth.currentUser!.uid}-${image.name}-${crypto.randomUUID()}`;
-        const storageRef = ref(storage, filename);
-        const uploadTask = uploadBytesResumable(storageRef, image);
-
-        uploadTask.on(
-          "state_changed",
-          (snapshot) => {
-            const progress =
-              (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-            console.log(`Upload is ${progress}% done`);
-          },
-          (error) => reject(error),
-          () => {
-            getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
-              resolve(downloadURL);
-            });
-          }
-        );
-      });
-    }
-
-    // Only upload new images if provided, otherwise keep existing
-    let imgUrls: string[] = (listing as any)?.imgUrls ?? [];
+    let imgUrls: string[] = listing?.imgUrls ?? [];
     if (images && images.length > 0) {
       const uploaded = await Promise.all(
         [...images].map((image) => storeImage(image))
@@ -213,25 +244,29 @@ export default function EditListing() {
       imgUrls = uploaded;
     }
 
-    // Build Firestore document
-    const formDataCopy: Partial<ListingData> & Record<string, any> = {
-      ...formData,
+    const updatedListing: WithFieldValue<ListingDocument> = {
+      type,
+      name,
+      bedrooms,
+      bathrooms,
+      parking,
+      furnished,
+      address,
+      description,
+      offer,
+      regularPrice,
+      ...(offer && { discountedPrice }),
       imgUrls,
       geolocation,
       timestamp: serverTimestamp(),
       userRef: auth.currentUser!.uid,
     };
 
-    delete formDataCopy.images;
-    delete formDataCopy.latitude;
-    delete formDataCopy.longitude;
-    if (!formDataCopy.offer) delete formDataCopy.discountedPrice;
-
     const docRef = doc(db, "listings", params.listingId!);
-    await updateDoc(docRef, formDataCopy);
+    await updateDoc(docRef, updatedListing as any);
     setLoading(false);
     toast.success("Listing updated");
-    navigate(`/category/${formDataCopy.type}/${docRef.id}`);
+    navigate(`/category/${updatedListing.type}/${docRef.id}`);
   }
 
   if (loading) return <Spinner />;
@@ -243,7 +278,7 @@ export default function EditListing() {
         <p className="text-lg mt-6 font-semibold">Sell / Rent</p>
         <div className="flex">
           <button
-            type="button" id="type" value="sale" onClick={onChange}
+            type="button" id="type" value="sale" onClick={onButtonClick}
             className={`mr-3 px-7 py-3 font-medium text-sm uppercase shadow-md rounded hover:shadow-lg focus:shadow-lg active:shadow-lg transition duration-150 ease-in-out w-full ${
               type === "rent" ? "bg-white text-black" : "bg-slate-600 text-white"
             }`}
@@ -251,7 +286,7 @@ export default function EditListing() {
             Sell
           </button>
           <button
-            type="button" id="type" value="rent" onClick={onChange}
+            type="button" id="type" value="rent" onClick={onButtonClick}
             className={`ml-3 px-7 py-3 font-medium text-sm uppercase shadow-md rounded hover:shadow-lg focus:shadow-lg active:shadow-lg transition duration-150 ease-in-out w-full ${
               type === "sale" ? "bg-white text-black" : "bg-slate-600 text-white"
             }`}
@@ -286,7 +321,7 @@ export default function EditListing() {
         <p className="text-lg mt-6 font-semibold">Parking spot</p>
         <div className="flex">
           <button
-            type="button" id="parking" value="true" onClick={onChange}
+            type="button" id="parking" value="true" onClick={onButtonClick}
             className={`mr-3 px-7 py-3 font-medium text-sm uppercase shadow-md rounded hover:shadow-lg focus:shadow-lg active:shadow-lg transition duration-150 ease-in-out w-full ${
               parking ? "bg-slate-600 text-white" : "bg-white text-black"
             }`}
@@ -294,7 +329,7 @@ export default function EditListing() {
             Yes
           </button>
           <button
-            type="button" id="parking" value="false" onClick={onChange}
+            type="button" id="parking" value="false" onClick={onButtonClick}
             className={`ml-3 px-7 py-3 font-medium text-sm uppercase shadow-md rounded hover:shadow-lg focus:shadow-lg active:shadow-lg transition duration-150 ease-in-out w-full ${
               !parking ? "bg-slate-600 text-white" : "bg-white text-black"
             }`}
@@ -305,7 +340,7 @@ export default function EditListing() {
         <p className="text-lg mt-6 font-semibold">Furnished</p>
         <div className="flex">
           <button
-            type="button" id="furnished" value="true" onClick={onChange}
+            type="button" id="furnished" value="true" onClick={onButtonClick}
             className={`mr-3 px-7 py-3 font-medium text-sm uppercase shadow-md rounded hover:shadow-lg focus:shadow-lg active:shadow-lg transition duration-150 ease-in-out w-full ${
               furnished ? "bg-slate-600 text-white" : "bg-white text-black"
             }`}
@@ -313,7 +348,7 @@ export default function EditListing() {
             Yes
           </button>
           <button
-            type="button" id="furnished" value="false" onClick={onChange}
+            type="button" id="furnished" value="false" onClick={onButtonClick}
             className={`ml-3 px-7 py-3 font-medium text-sm uppercase shadow-md rounded hover:shadow-lg focus:shadow-lg active:shadow-lg transition duration-150 ease-in-out w-full ${
               !furnished ? "bg-slate-600 text-white" : "bg-white text-black"
             }`}
@@ -356,7 +391,7 @@ export default function EditListing() {
         <p className="text-lg font-semibold">Offer</p>
         <div className="flex mb-6">
           <button
-            type="button" id="offer" value="true" onClick={onChange}
+            type="button" id="offer" value="true" onClick={onButtonClick}
             className={`mr-3 px-7 py-3 font-medium text-sm uppercase shadow-md rounded hover:shadow-lg focus:shadow-lg active:shadow-lg transition duration-150 ease-in-out w-full ${
               offer ? "bg-slate-600 text-white" : "bg-white text-black"
             }`}
@@ -364,7 +399,7 @@ export default function EditListing() {
             Yes
           </button>
           <button
-            type="button" id="offer" value="false" onClick={onChange}
+            type="button" id="offer" value="false" onClick={onButtonClick}
             className={`ml-3 px-7 py-3 font-medium text-sm uppercase shadow-md rounded hover:shadow-lg focus:shadow-lg active:shadow-lg transition duration-150 ease-in-out w-full ${
               !offer ? "bg-slate-600 text-white" : "bg-white text-black"
             }`}

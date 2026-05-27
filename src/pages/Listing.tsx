@@ -1,5 +1,5 @@
 import { doc, getDoc } from "firebase/firestore";
-import { useState, useEffect } from "react";
+import { useState, useEffect, ComponentType } from "react";
 import { useParams } from "react-router-dom";
 import Spinner from "../components/Spinner";
 import { db } from "../firebase";
@@ -15,7 +15,7 @@ import {
   FaChair,
 } from "react-icons/fa";
 import { getAuth } from "firebase/auth";
-import Contact from "../components/Contact";
+import { Contact } from "../components/Contact";
 import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
 
 interface Listing {

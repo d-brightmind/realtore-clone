@@ -39,7 +39,7 @@ function buildMailtoLink(landlord: Landlord, listing: Listing, message: string):
   return `mailto:${landlord.email}?Subject=${encodeURIComponent(listing.name)}&body=${encodeURIComponent(message)}`;
 }
 
-export async function initContact({ userRef, listing }: ContactProps): Promise<ContactResult> {
+export async function Contact({ userRef, listing }: ContactProps): Promise<ContactResult> {
   const landlord = await fetchLandlord(userRef);
   let message = "";
 

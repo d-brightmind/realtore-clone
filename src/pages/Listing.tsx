@@ -1,5 +1,5 @@
-import { doc, getDoc } from "firebase/firestore";
-import { useState, useEffect, ComponentType } from "react";
+import { doc, getDoc, Timestamp } from "firebase/firestore";
+import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import Spinner from "../components/Spinner";
 import { db } from "../firebase";
@@ -15,10 +15,10 @@ import {
   FaChair,
 } from "react-icons/fa";
 import { getAuth } from "firebase/auth";
-import { Contact } from "../components/Contact";
+import Contact from "../components/Contact";
 import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
 
-interface Listing {
+export interface Listing {
   name: string;
   type: "rent" | "sale";
   address: string;
@@ -33,19 +33,23 @@ interface Listing {
   userRef: string;
   description: string;
   geolocation: { lat: number; lng: number };
-  timestamp: any;
+  timestamp: Timestamp;
+}
+
+function formatPrice(price: number): string {
+  return price.toLocaleString("en-US");
 }
 
 export default function Listing() {
   const params = useParams<{ listingId: string }>();
-  const auth = getAuth(); // ✅ add this to get current user
+  const auth = getAuth();
   const [listing, setListing] = useState<Listing | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [shareLinkCopied, setShareLinkCopied] = useState(false);
-  const [contactLandlord, setContactLandlord] = useState(false);
+  const [shareLinkCopied, setShareLinkCopied] = useState<boolean>(false);
+  const [contactLandlord, setContactLandlord] = useState<boolean>(false);
 
   useEffect(() => {
-    async function fetchListing() {
+    async function fetchListing(): Promise<void> {
       const docRef = doc(db, "listings", params.listingId!);
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
@@ -57,7 +61,17 @@ export default function Listing() {
   }, [params.listingId]);
 
   if (loading) return <Spinner />;
-  if (!listing) return null; // ✅ guards against listing being null after loading
+  if (!listing) return null;
+
+  const displayPrice =
+    listing.offer && listing.discountedPrice != null
+      ? formatPrice(listing.discountedPrice)
+      : formatPrice(listing.regularPrice);
+
+  const discount =
+    listing.offer && listing.discountedPrice != null
+      ? listing.regularPrice - listing.discountedPrice
+      : 0;
 
   return (
     <main>
@@ -77,7 +91,7 @@ export default function Listing() {
                 background: `url(${url}) center no-repeat`,
                 backgroundSize: "cover",
               }}
-            ></div>
+            />
           </SwiperSlide>
         ))}
       </Swiper>
@@ -87,29 +101,22 @@ export default function Listing() {
         onClick={() => {
           navigator.clipboard.writeText(window.location.href);
           setShareLinkCopied(true);
-          setTimeout(() => {
-            setShareLinkCopied(false);
-          }, 2000);
+          setTimeout(() => setShareLinkCopied(false), 2000);
         }}
       >
         <FaShare className="text-lg text-slate-500" />
       </div>
+
       {shareLinkCopied && (
         <p className="fixed top-[23%] right-[5%] font-semibold border-2 border-gray-400 rounded-md bg-white z-10 p-2">
           Link Copied
         </p>
       )}
+
       <div className="m-4 flex flex-col md:flex-row max-w-6xl lg:mx-auto p-4 rounded-lg shadow-lg bg-white lg:space-x-5">
-        <div className=" w-full ">
+        <div className="w-full">
           <p className="text-2xl font-bold mb-3 text-blue-900">
-            {listing.name} - ${" "}
-            {listing.offer
-              ? listing.discountedPrice!
-                  .toString()
-                  .replace(/\B(?=(\d{3})+(?!\d))/g, ",")
-              : listing.regularPrice
-                  .toString()
-                  .replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+            {listing.name} - ${displayPrice}
             {listing.type === "rent" ? " / month" : ""}
           </p>
           <p className="flex items-center mt-6 mb-3 font-semibold">
@@ -120,9 +127,9 @@ export default function Listing() {
             <p className="bg-red-800 w-full max-w-50 rounded-md p-1 text-white text-center font-semibold shadow-md">
               {listing.type === "rent" ? "Rent" : "Sale"}
             </p>
-            {listing.offer && (
+            {listing.offer && discount > 0 && (
               <p className="w-full max-w-50 bg-green-800 rounded-md p-1 text-white text-center font-semibold shadow-md">
-                ${+listing.regularPrice - +listing.discountedPrice!} discount
+                ${formatPrice(discount)} discount
               </p>
             )}
           </div>
@@ -133,11 +140,11 @@ export default function Listing() {
           <ul className="flex items-center space-x-2 sm:space-x-10 text-sm font-semibold mb-6">
             <li className="flex items-center whitespace-nowrap">
               <FaBed className="text-lg mr-1" />
-              {+listing.bedrooms > 1 ? `${listing.bedrooms} Beds` : "1 Bed"}
+              {listing.bedrooms > 1 ? `${listing.bedrooms} Beds` : "1 Bed"}
             </li>
             <li className="flex items-center whitespace-nowrap">
               <FaBath className="text-lg mr-1" />
-              {+listing.bathrooms > 1 ? `${listing.bathrooms} Baths` : "1 Bath"}
+              {listing.bathrooms > 1 ? `${listing.bathrooms} Baths` : "1 Bath"}
             </li>
             <li className="flex items-center whitespace-nowrap">
               <FaParking className="text-lg mr-1" />
@@ -152,7 +159,7 @@ export default function Listing() {
             <div className="mt-6">
               <button
                 onClick={() => setContactLandlord(true)}
-                className="px-7 py-3 bg-blue-600 text-white font-medium text-sm uppercase rounded shadow-md hover:bg-blue-700 hover:shadow-lg focus:bg-blue-700 focus:shadow-lg w-full text-center transition duration-150 ease-in-out "
+                className="px-7 py-3 bg-blue-600 text-white font-medium text-sm uppercase rounded shadow-md hover:bg-blue-700 hover:shadow-lg focus:bg-blue-700 focus:shadow-lg w-full text-center transition duration-150 ease-in-out"
               >
                 Contact Landlord
               </button>
@@ -176,9 +183,7 @@ export default function Listing() {
             <Marker
               position={[listing.geolocation.lat, listing.geolocation.lng]}
             >
-              <Popup>
-                {listing.address}
-              </Popup>
+              <Popup>{listing.address}</Popup>
             </Marker>
           </MapContainer>
         </div>

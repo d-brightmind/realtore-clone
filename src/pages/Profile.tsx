@@ -1,7 +1,7 @@
 import { getAuth, updateProfile } from 'firebase/auth';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { toast } from 'react-toastify';  // ✅ fixed import path
+import { toast } from 'react-toastify';
 import {
   collection,
   doc,
@@ -11,13 +11,13 @@ import {
   query,
   updateDoc,
   where,
+  Timestamp,
 } from "firebase/firestore";
 import ListingItem from "../components/ListingItem";
 import { db } from '../firebase';
 import { FcHome } from 'react-icons/fc';
 import { Link } from 'react-router-dom';
 
-// ✅ Added Listing interface
 interface Listing {
   name: string;
   type: "rent" | "sale";
@@ -31,7 +31,7 @@ interface Listing {
   furnished: boolean;
   imgUrls: string[];
   userRef: string;
-  timestamp: any;
+  timestamp: Timestamp;
 }
 
 interface ListingWithId {
@@ -39,38 +39,40 @@ interface ListingWithId {
   data: Listing;
 }
 
+interface FormData {
+  name: string;
+  email: string;
+}
+
 export default function Profile() {
   const auth = getAuth();
   const navigate = useNavigate();
-  const [listings, setListings] = useState<ListingWithId[]>([]); // ✅ typed, default []
-  const [loading, setLoading] = useState(true);
-  const [changeDetails, setChangeDetails] = React.useState(false); // ✅ consistent naming
-
-  const [formData, setFormData] = React.useState({
-    name: auth.currentUser?.displayName || '',
-    email: auth.currentUser?.email || ''
+  const [listings, setListings] = useState<ListingWithId[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [changeDetails, setChangeDetails] = useState<boolean>(false);
+  const [formData, setFormData] = useState<FormData>({
+    name: auth.currentUser?.displayName ?? '',
+    email: auth.currentUser?.email ?? '',
   });
 
   const { name, email } = formData;
 
-  function onLogOut() { // ✅ fixed name (was onLogout in JSX, onLogOut in function)
+  function onLogOut(): void {
     auth.signOut();
     navigate("/sign-in");
   }
 
-  function onChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setFormData((prevState) => ({
-      ...prevState,
-      [e.target.id]: e.target.value
+  function onChange(e: React.ChangeEvent<HTMLInputElement>): void {
+    setFormData((prev) => ({
+      ...prev,
+      [e.target.id]: e.target.value,
     }));
   }
 
-  async function onSubmit() {
+  async function onSubmit(): Promise<void> {
     try {
       if (auth.currentUser?.displayName !== name) {
-        await updateProfile(auth.currentUser!, {
-          displayName: name
-        });
+        await updateProfile(auth.currentUser!, { displayName: name });
         const docRef = doc(db, "users", auth.currentUser!.uid);
         await updateDoc(docRef, { name });
       }
@@ -81,7 +83,7 @@ export default function Profile() {
   }
 
   useEffect(() => {
-    async function fetchUserListings() {
+    async function fetchUserListings(): Promise<void> {
       const listingRef = collection(db, "listings");
       const q = query(
         listingRef,
@@ -89,30 +91,26 @@ export default function Profile() {
         orderBy("timestamp", "desc")
       );
       const querySnap = await getDocs(q);
-      const listings: ListingWithId[] = [];
-      querySnap.forEach((doc) => {
-        listings.push({
+      setListings(
+        querySnap.docs.map((doc) => ({
           id: doc.id,
           data: doc.data() as Listing,
-        });
-      });
-      setListings(listings);
+        }))
+      );
       setLoading(false);
     }
     fetchUserListings();
-  }, [auth.currentUser!.uid]);
+  }, [auth.currentUser]);
 
-  async function onDelete(listingID: string) {
+  async function onDelete(listingID: string): Promise<void> {
     if (window.confirm("Are you sure you want to delete?")) {
       await deleteDoc(doc(db, "listings", listingID));
-      const updatedListings = listings.filter(
-        (listing) => listing.id !== listingID
-      );
-      setListings(updatedListings);
+      setListings((prev) => prev.filter((listing) => listing.id !== listingID));
       toast.success("Successfully deleted the listing");
     }
   }
-  function onEdit(listingID: string) {
+
+  function onEdit(listingID: string): void {
     navigate(`/edit-listing/${listingID}`);
   }
 
@@ -126,10 +124,10 @@ export default function Profile() {
               type="text"
               id="name"
               value={name}
-              disabled={!changeDetails} // ✅ fixed variable name
+              disabled={!changeDetails}
               onChange={onChange}
               className={`mb-6 w-full px-4 py-2 text-xl text-gray-700 bg-white border border-gray-300 rounded transition ease-in-out ${
-                changeDetails && "bg-red-200 focus:bg-red-200" // ✅ fixed variable name
+                changeDetails && "bg-red-200 focus:bg-red-200"
               }`}
             />
             <input
@@ -144,23 +142,22 @@ export default function Profile() {
                 Do you want to change your name?
                 <span
                   onClick={() => {
-                    changeDetails && onSubmit(); // ✅ fixed variable name
-                    setChangeDetails((prevState) => !prevState); // ✅ fixed variable name
+                    if (changeDetails) onSubmit();
+                    setChangeDetails((prev) => !prev);
                   }}
                   className="text-red-600 hover:text-red-700 transition ease-in-out duration-200 ml-1 cursor-pointer"
                 >
-                  {changeDetails ? "Apply change" : "Edit"} {/* ✅ fixed variable name */}
+                  {changeDetails ? "Apply change" : "Edit"}
                 </span>
               </p>
               <p
-                onClick={onLogOut} // ✅ fixed function name
+                onClick={onLogOut}
                 className="text-blue-600 hover:text-blue-800 transition duration-200 ease-in-out cursor-pointer"
               >
                 Sign out
               </p>
             </div>
           </form>
-          {/* ✅ Removed duplicate button, fixed nested button/Link structure */}
           <button
             type="button"
             className="w-full bg-blue-600 text-white uppercase px-7 py-3 text-sm font-medium rounded shadow-md hover:bg-blue-700 transition duration-150 ease-in-out hover:shadow-lg active:bg-blue-800"

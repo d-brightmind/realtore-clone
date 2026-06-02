@@ -6,7 +6,7 @@ import Profile from "./pages/Profile";
 import ForgotPassword from "./pages/ForgotPassword";
 import Offers from "./pages/Offers";
 import Header from "./components/Header";
-import { Bounce, ToastContainer } from "react-toastify/unstyled";
+import { Bounce, ToastContainer } from "react-toastify";
 import PrivateRoute from "./components/PrivateRoute";
 import CreateListing from "./pages/CreateListing";
 import EditListing from "./pages/EditListing";
@@ -18,28 +18,27 @@ function App() {
   return (
     <>
       <Router>
-        <Header/>
+        <Header />
         <Routes>
-          <Route path="/" element={<Home />}/>
-          <Route path="/sign-in" element={<SignIn />}/>
-          <Route path="/sign-up" element={<SignUp />}/>
+          <Route path="/" element={<Home />} />
+          <Route path="/sign-in" element={<SignIn />} />
+          <Route path="/sign-up" element={<SignUp />} />
           <Route path="/profile" element={<PrivateRoute />}>
-            <Route path="/profile" element={<Profile />}/>
+            <Route path="/profile" element={<Profile />} />
           </Route>
-          <Route path="/offers" element={<Offers />}/>
+          <Route path="/offers" element={<Offers />} />
           <Route path="/category/:categoryName" element={<Category />} />
-          <Route path="/forgot-password" element={<ForgotPassword />}/>
+          <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route
             path="/category/:categoryName/:listingId"
             element={<Listing />}
           />
           <Route path="/create-listing" element={<PrivateRoute />}>
-            <Route path="/create-listing" element={<CreateListing />}/>
+            <Route path="/create-listing" element={<CreateListing />} />
           </Route>
-          <Route path="edit-listing" element={<PrivateRoute />}>
+          <Route path="/edit-listing" element={<PrivateRoute />}>
             <Route path="/edit-listing/:listingId" element={<EditListing />} />
           </Route>
-          
         </Routes>
       </Router>
       <ToastContainer
@@ -54,9 +53,9 @@ function App() {
         pauseOnHover
         theme="dark"
         transition={Bounce}
-        />
+      />
     </>
-  )
+  );
 }
 
-export default App
+export default App;

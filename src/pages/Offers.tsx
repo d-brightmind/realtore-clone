@@ -64,10 +64,11 @@ export default function Offers() {
             data: doc.data() as ListingData,
           }))
         );
-        setLoading(false);
       } catch (error) {
         console.error(error);
         toast.error("Could not fetch listings");
+      } finally {
+        setLoading(false);
       }
     }
     fetchListings();

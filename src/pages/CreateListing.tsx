@@ -81,21 +81,26 @@ export default function CreateListing() {
     discountedPrice, latitude, longitude, images,
   } = formData;
 
-  function onChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
-    const target = e.currentTarget;
+function onChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
+  const target = e.currentTarget;
 
-    if (target instanceof HTMLInputElement && target.files) {
-      setFormData((prev) => ({ ...prev, images: target.files }));
-      return;
-    }
-
-    const value =
-      target.value === "true" ? true
-      : target.value === "false" ? false
-      : target.value;
-
-    setFormData((prev) => ({ ...prev, [target.id]: value }));
+  if (target instanceof HTMLInputElement && target.files) {
+    setFormData((prev) => ({ ...prev, images: target.files }));
+    return;
   }
+
+  const numericFields = new Set([
+    "bedrooms", "bathrooms", "regularPrice",
+    "discountedPrice", "latitude", "longitude",
+  ]);
+
+  let value: string | number | boolean = target.value;
+  if (target.value === "true") value = true;
+  else if (target.value === "false") value = false;
+  else if (numericFields.has(target.id)) value = Number(target.value);
+
+  setFormData((prev) => ({ ...prev, [target.id]: value }));
+}
 
   function onButtonClick(e: React.MouseEvent<HTMLButtonElement>) {
     const { id, value } = e.currentTarget;

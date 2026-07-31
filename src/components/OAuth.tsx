@@ -4,12 +4,13 @@ import { getAuth, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { db } from "../firebase";
 import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { useNavigate } from "react-router";
+import { authErrorMessage } from "../utils/authErrorMessage";
 
 interface UserData {
   name: string | null;
   email: string | null;
   avatar: string | null;
-  timeStamp: ReturnType<typeof serverTimestamp>;
+  timestamp: ReturnType<typeof serverTimestamp>;
 }
 
 export default function OAuth() {
@@ -30,7 +31,7 @@ export default function OAuth() {
           name: user.displayName,
           email: user.email,
           avatar: user.photoURL,
-          timeStamp: serverTimestamp(),
+          timestamp: serverTimestamp(),
         };
         await setDoc(docRef, userData);
       }
@@ -38,7 +39,8 @@ export default function OAuth() {
       navigate("/");
       toast.success("Google sign-in successful");
     } catch (error) {
-      toast.error("Could not authorize with Google");
+      console.error(error);
+      toast.error(authErrorMessage(error, "Could not authorize with Google"));
     }
   }
 

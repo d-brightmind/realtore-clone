@@ -56,7 +56,7 @@ interface ListingDocument {
 export default function CreateListing() {
   const navigate = useNavigate();
   const auth = getAuth();
-  const [geolocationEnabled] = useState<boolean>(true);
+  const [geolocationEnabled] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [formData, setFormData] = useState<FormData>({
     type: "rent",
@@ -116,10 +116,7 @@ export default function CreateListing() {
 
       uploadTask.on(
         "state_changed",
-        (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          console.log(`Upload is ${progress.toFixed(1)}% done`);
-        },
+        undefined,
         reject,
         () => getDownloadURL(uploadTask.snapshot.ref).then(resolve)
       );
@@ -142,20 +139,36 @@ export default function CreateListing() {
       return;
     }
 
+    const invalidImage = [...images].find(
+      (image) => !image.type.startsWith("image/") || image.size > 2 * 1024 * 1024
+    );
+    if (invalidImage) {
+      setLoading(false);
+      toast.error("Images must be image files under 2MB");
+      return;
+    }
+
     let geolocation: GeolocationData = { lat: 0, lng: 0 };
 
     if (geolocationEnabled) {
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?address=${address}&key=${import.meta.env.VITE_GEOCODE_API_KEY}`
-      );
-      const data = await response.json();
+      try {
+        const response = await fetch(
+          `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${import.meta.env.VITE_GEOCODE_API_KEY}`
+        );
+        const data = await response.json();
 
-      geolocation.lat = data.results[0]?.geometry.location.lat ?? 0;
-      geolocation.lng = data.results[0]?.geometry.location.lng ?? 0;
+        if (data.status === "ZERO_RESULTS" || !data.results?.[0]) {
+          setLoading(false);
+          toast.error("Please enter a correct address");
+          return;
+        }
 
-      if (data.status === "ZERO_RESULTS") {
+        geolocation.lat = data.results[0].geometry.location.lat ?? 0;
+        geolocation.lng = data.results[0].geometry.location.lng ?? 0;
+      } catch (error) {
+        console.error(error);
         setLoading(false);
-        toast.error("Please enter a correct address");
+        toast.error("Could not look up address location");
         return;
       }
     } else {
@@ -228,7 +241,7 @@ export default function CreateListing() {
             rent
           </button>
         </div>
-        <p className="text-lg mt-6 font-semibold">Name</p>
+        <label htmlFor="name" className="text-lg mt-6 font-semibold block">Name</label>
         <input
           type="text"
           id="name"
@@ -242,7 +255,7 @@ export default function CreateListing() {
         />
         <div className="flex space-x-6 mb-6">
           <div>
-            <p className="text-lg font-semibold">Beds</p>
+            <label htmlFor="bedrooms" className="text-lg font-semibold block">Beds</label>
             <input
               type="number"
               id="bedrooms"
@@ -255,7 +268,7 @@ export default function CreateListing() {
             />
           </div>
           <div>
-            <p className="text-lg font-semibold">Baths</p>
+            <label htmlFor="bathrooms" className="text-lg font-semibold block">Baths</label>
             <input
               type="number"
               id="bathrooms"
@@ -318,7 +331,7 @@ export default function CreateListing() {
             No
           </button>
         </div>
-        <p className="text-lg mt-6 font-semibold">Address</p>
+        <label htmlFor="address" className="text-lg mt-6 font-semibold block">Address</label>
         <textarea
           id="address"
           value={address}
@@ -330,7 +343,7 @@ export default function CreateListing() {
         {!geolocationEnabled && (
           <div className="flex space-x-6 justify-start mb-6">
             <div>
-              <p className="text-lg font-semibold">Latitude</p>
+              <label htmlFor="latitude" className="text-lg font-semibold block">Latitude</label>
               <input
                 type="number"
                 id="latitude"
@@ -343,7 +356,7 @@ export default function CreateListing() {
               />
             </div>
             <div>
-              <p className="text-lg font-semibold">Longitude</p>
+              <label htmlFor="longitude" className="text-lg font-semibold block">Longitude</label>
               <input
                 type="number"
                 id="longitude"
@@ -357,7 +370,7 @@ export default function CreateListing() {
             </div>
           </div>
         )}
-        <p className="text-lg font-semibold">Description</p>
+        <label htmlFor="description" className="text-lg font-semibold block">Description</label>
         <textarea
           id="description"
           value={description}
@@ -393,7 +406,7 @@ export default function CreateListing() {
         </div>
         <div className="flex items-center mb-6">
           <div className="w-full">
-            <p className="text-lg font-semibold">Regular price</p>
+            <label htmlFor="regularPrice" className="text-lg font-semibold block">Regular price</label>
             <div className="flex w-full justify-center items-center space-x-6">
               <input
                 type="number"
@@ -414,7 +427,7 @@ export default function CreateListing() {
         {offer && (
           <div className="flex items-center mb-6">
             <div className="w-full">
-              <p className="text-lg font-semibold">Discounted price</p>
+              <label htmlFor="discountedPrice" className="text-lg font-semibold block">Discounted price</label>
               <div className="flex w-full justify-center items-center space-x-6">
                 <input
                   type="number"
@@ -434,7 +447,7 @@ export default function CreateListing() {
           </div>
         )}
         <div className="mb-6">
-          <p className="text-lg font-semibold">Images</p>
+          <label htmlFor="images" className="text-lg font-semibold block">Images</label>
           <p className="text-gray-600">The first image will be the cover (max 6)</p>
           <input
             type="file"

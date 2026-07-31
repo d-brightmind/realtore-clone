@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router';
 import OAuth from '../components/OAuth';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { toast } from 'react-toastify';
+import { authErrorMessage } from '../utils/authErrorMessage';
 
 interface FormData {
   email: string;
@@ -37,7 +38,8 @@ export default function SignIn() {
       }
       toast.success("Sign-in successful");
     } catch (error) {
-      toast.error("Could not sign in");
+      console.error(error);
+      toast.error(authErrorMessage(error, "Could not sign in"));
     }
   }
 
@@ -58,30 +60,32 @@ export default function SignIn() {
               className="w-full px-4 py-2 text-xl text-gray-700 bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded transition ease-in-out duration-200 mb-6"
               type="email"
               placeholder="Email address"
+              aria-label="Email address"
               id="email"
               value={email}
               onChange={onChange}
+              required
             />
             <div className="relative mb-6">
               <input
                 className="w-full px-4 py-2 text-xl text-gray-700 bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded transition ease-in-out duration-200"
                 type={showPassword ? "text" : "password"}
                 placeholder="Password"
+                aria-label="Password"
                 id="password"
                 value={password}
                 onChange={onChange}
+                required
+                minLength={6}
               />
-              {showPassword ? (
-                <AiFillEyeInvisible
-                  className="absolute right-3 top-3 text-xl cursor-pointer"
-                  onClick={() => setShowPassword((prev) => !prev)}
-                />
-              ) : (
-                <AiFillEye
-                  className="absolute right-3 top-3 text-xl cursor-pointer"
-                  onClick={() => setShowPassword((prev) => !prev)}
-                />
-              )}
+              <button
+                type="button"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute right-3 top-3 text-xl cursor-pointer"
+              >
+                {showPassword ? <AiFillEyeInvisible /> : <AiFillEye />}
+              </button>
             </div>
             <div className="flex justify-between whitespace-nowrap text-sm sm:text-lg">
               <p className="mb-6">

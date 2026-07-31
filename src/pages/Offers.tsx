@@ -66,6 +66,7 @@ export default function Offers() {
         );
         setLoading(false);
       } catch (error) {
+        console.error(error);
         toast.error("Could not fetch listings");
       }
     }
@@ -94,6 +95,7 @@ export default function Offers() {
       ]);
       setLoading(false);
     } catch (error) {
+      console.error(error);
       toast.error("Could not fetch listings");
     }
   }

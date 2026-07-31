@@ -101,16 +101,24 @@ export default function ListingItem({ listing, id, onEdit, onDelete }: ListingIt
         </div>
       </Link>
       {onDelete && (
-        <FaTrash
-          className="absolute bottom-2 right-2 h-3.5 cursor-pointer text-red-500"
+        <button
+          type="button"
+          aria-label="Delete listing"
+          className="absolute bottom-2 right-2 cursor-pointer"
           onClick={() => onDelete(id)}
-        />
+        >
+          <FaTrash className="h-3.5 text-red-500" />
+        </button>
       )}
       {onEdit && (
-        <MdEdit
-          className="absolute bottom-2 right-7 h-4 cursor-pointer"
+        <button
+          type="button"
+          aria-label="Edit listing"
+          className="absolute bottom-2 right-7 cursor-pointer"
           onClick={() => onEdit(id)}
-        />
+        >
+          <MdEdit className="h-4" />
+        </button>
       )}
     </li>
   );

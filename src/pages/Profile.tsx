@@ -1,6 +1,6 @@
 import { getAuth, updateProfile } from 'firebase/auth';
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { toast } from 'react-toastify';
 import {
   collection,
@@ -16,7 +16,6 @@ import {
 import ListingItem from "../components/ListingItem";
 import { db } from '../firebase';
 import { FcHome } from 'react-icons/fc';
-import { Link } from 'react-router-dom';
 
 interface Listing {
   name: string;
@@ -78,35 +77,53 @@ export default function Profile() {
       }
       toast.success("Profile details updated");
     } catch (error) {
+      console.error(error);
       toast.error("Could not update profile details");
     }
   }
 
   useEffect(() => {
     async function fetchUserListings(): Promise<void> {
-      const listingRef = collection(db, "listings");
-      const q = query(
-        listingRef,
-        where("userRef", "==", auth.currentUser!.uid),
-        orderBy("timestamp", "desc")
-      );
-      const querySnap = await getDocs(q);
-      setListings(
-        querySnap.docs.map((doc) => ({
-          id: doc.id,
-          data: doc.data() as Listing,
-        }))
-      );
-      setLoading(false);
+      try {
+        const listingRef = collection(db, "listings");
+        const q = query(
+          listingRef,
+          where("userRef", "==", auth.currentUser!.uid),
+          orderBy("timestamp", "desc")
+        );
+        const querySnap = await getDocs(q);
+        setListings(
+          querySnap.docs.map((doc) => ({
+            id: doc.id,
+            data: doc.data() as Listing,
+          }))
+        );
+      } catch (error) {
+        console.error(error);
+        toast.error("Could not load your listings");
+      } finally {
+        setLoading(false);
+      }
     }
     fetchUserListings();
-  }, [auth.currentUser]);
+  }, [auth.currentUser?.uid]);
 
   async function onDelete(listingID: string): Promise<void> {
+    const target = listings.find((listing) => listing.id === listingID);
+    if (target && target.data.userRef !== auth.currentUser?.uid) {
+      toast.error("You can't delete this listing");
+      return;
+    }
+
     if (window.confirm("Are you sure you want to delete?")) {
-      await deleteDoc(doc(db, "listings", listingID));
-      setListings((prev) => prev.filter((listing) => listing.id !== listingID));
-      toast.success("Successfully deleted the listing");
+      try {
+        await deleteDoc(doc(db, "listings", listingID));
+        setListings((prev) => prev.filter((listing) => listing.id !== listingID));
+        toast.success("Successfully deleted the listing");
+      } catch (error) {
+        console.error(error);
+        toast.error("Could not delete the listing");
+      }
     }
   }
 
@@ -123,6 +140,7 @@ export default function Profile() {
             <input
               type="text"
               id="name"
+              aria-label="Full name"
               value={name}
               disabled={!changeDetails}
               onChange={onChange}
@@ -133,6 +151,7 @@ export default function Profile() {
             <input
               type="email"
               id="email"
+              aria-label="Email address"
               value={email}
               disabled
               className="mb-6 w-full px-4 py-2 text-xl text-gray-700 bg-white border border-gray-300 rounded transition ease-in-out"
@@ -140,7 +159,8 @@ export default function Profile() {
             <div className="flex justify-between whitespace-nowrap text-sm sm:text-lg mb-6">
               <p className="flex items-center">
                 Do you want to change your name?
-                <span
+                <button
+                  type="button"
                   onClick={() => {
                     if (changeDetails) onSubmit();
                     setChangeDetails((prev) => !prev);
@@ -148,14 +168,15 @@ export default function Profile() {
                   className="text-red-600 hover:text-red-700 transition ease-in-out duration-200 ml-1 cursor-pointer"
                 >
                   {changeDetails ? "Apply change" : "Edit"}
-                </span>
+                </button>
               </p>
-              <p
+              <button
+                type="button"
                 onClick={onLogOut}
                 className="text-blue-600 hover:text-blue-800 transition duration-200 ease-in-out cursor-pointer"
               >
                 Sign out
-              </p>
+              </button>
             </div>
           </form>
           <button
@@ -187,6 +208,11 @@ export default function Profile() {
               ))}
             </ul>
           </>
+        )}
+        {!loading && listings.length === 0 && (
+          <p className="text-center text-gray-600 mb-6">
+            You haven't listed anything yet.
+          </p>
         )}
       </div>
     </>

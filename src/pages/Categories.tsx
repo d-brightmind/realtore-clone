@@ -63,6 +63,7 @@ export default function Category() {
         })));
         setLoading(false);
       } catch (error) {
+        console.error(error);
         toast.error("Could not fetch listings");
       }
     }
@@ -92,6 +93,7 @@ export default function Category() {
       ]);
       setLoading(false);
     } catch (error) {
+      console.error(error);
       toast.error("Could not fetch listings");
     }
   }

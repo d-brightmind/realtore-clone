@@ -20,11 +20,16 @@ export default function Contact({ userRef, listing }: ContactProps) {
 
   useEffect(() => {
     async function getLandlord(): Promise<void> {
-      const docRef = doc(db, "users", userRef);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        setLandlord(docSnap.data() as Landlord);
-      } else {
+      try {
+        const docRef = doc(db, "users", userRef);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setLandlord(docSnap.data() as Landlord);
+        } else {
+          toast.error("Could not get landlord data");
+        }
+      } catch (error) {
+        console.error(error);
         toast.error("Could not get landlord data");
       }
     }
@@ -42,6 +47,7 @@ export default function Contact({ userRef, listing }: ContactProps) {
         <textarea
           name="message"
           id="message"
+          aria-label="Message"
           rows={2}
           value={message}
           onChange={(e) => setMessage(e.target.value)}

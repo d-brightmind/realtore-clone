@@ -1,5 +1,6 @@
 import { collection, getDocs, limit, orderBy, query, Timestamp } from "firebase/firestore";
 import { useState, useEffect } from "react";
+import { toast } from "react-toastify";
 import Spinner from "../components/Spinner";
 import { db } from "../firebase";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -28,17 +29,23 @@ export default function Slider() {
 
   useEffect(() => {
     async function fetchListings(): Promise<void> {
-      const listingsRef = collection(db, "listings");
-      const q = query(listingsRef, orderBy("timestamp", "desc"), limit(5));
-      const querySnap = await getDocs(q);
+      try {
+        const listingsRef = collection(db, "listings");
+        const q = query(listingsRef, orderBy("timestamp", "desc"), limit(5));
+        const querySnap = await getDocs(q);
 
-      const fetched: ListingWithId[] = querySnap.docs.map((doc) => ({
-        id: doc.id,
-        data: doc.data() as ListingData,
-      }));
+        const fetched: ListingWithId[] = querySnap.docs.map((doc) => ({
+          id: doc.id,
+          data: doc.data() as ListingData,
+        }));
 
-      setListings(fetched);
-      setLoading(false);
+        setListings(fetched);
+      } catch (error) {
+        console.error(error);
+        toast.error("Could not load featured listings");
+      } finally {
+        setLoading(false);
+      }
     }
 
     fetchListings();
@@ -61,12 +68,10 @@ export default function Slider() {
           key={id}
           onClick={() => navigate(`/category/${data.type}/${id}`)}
         >
-          <div
-            style={{
-              background: `url(${data.imgUrls[0]}) center no-repeat`,
-              backgroundSize: "cover",
-            }}
-            className="relative w-full h-75 overflow-hidden"
+          <img
+            src={data.imgUrls[0]}
+            alt={data.name}
+            className="w-full h-75 overflow-hidden object-cover"
           />
           <p className="text-[#f1faee] absolute left-1 top-3 font-medium max-w-[90%] bg-[#457b9d] shadow-lg opacity-90 p-2 rounded-br-3xl">
             {data.name}

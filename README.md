@@ -1,73 +1,61 @@
-# React + TypeScript + Vite
+# Realtore Clone
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A real-estate listing app (browse, create, edit, and search property listings)
+built with React 19, TypeScript, Vite, Tailwind CSS, and Firebase
+(Auth, Firestore, Storage).
 
-Currently, two official plugins are available:
+## Setup
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Create a `.env` file in the project root with the following variables:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
 ```
+VITE_FIREBASE_API_KEY=
+VITE_FIREBASE_AUTH_DOMAIN=
+VITE_FIREBASE_PROJECT_ID=
+VITE_FIREBASE_STORAGE_BUCKET=
+VITE_FIREBASE_MESSAGING_SENDER_ID=
+VITE_FIREBASE_APP_ID=
+VITE_FIREBASE_MEASUREMENT_ID=
+VITE_GEOCODE_API_KEY=
+```
+
+- The `VITE_FIREBASE_*` values come from your Firebase project settings
+  (Project settings → General → Your apps). All of them except
+  `VITE_FIREBASE_MEASUREMENT_ID` are required — the app will refuse to start
+  if any are missing (see `src/firebase.ts`).
+- `VITE_GEOCODE_API_KEY` is a Google Geocoding API key, only needed if you
+  enable automatic address-to-coordinates lookup (see "Geolocation" below).
+
+## Development
+
+```bash
+npm run dev      # start the dev server
+npm run lint      # run ESLint
+npm run build     # type-check (tsc -b) and build for production
+npm run preview   # preview a production build locally
+```
+
+## Firebase Security Rules
+
+`firestore.rules` and `storage.rules` in this repo define the access rules
+for listings, user profiles, and uploaded images. They are **not**
+automatically deployed — push them with the
+[Firebase CLI](https://firebase.google.com/docs/cli):
+
+```bash
+firebase deploy --only firestore:rules,storage:rules
+```
+
+Review them against your project's actual current rules before deploying to
+production, since deploying will replace whatever is currently live.
+
+## Geolocation
+
+Listing creation/editing supports either manual latitude/longitude entry
+(the default) or automatic geocoding from the entered address via the Google
+Geocoding API, gated behind `VITE_GEOCODE_API_KEY`. Manual entry is the
+default because it has no external dependency or cost.

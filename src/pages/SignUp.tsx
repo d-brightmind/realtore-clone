@@ -6,6 +6,7 @@ import { getAuth, createUserWithEmailAndPassword, updateProfile } from 'firebase
 import { db } from '../firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { toast } from 'react-toastify';
+import { authErrorMessage } from '../utils/authErrorMessage';
 
 interface FormData {
   name: string;
@@ -46,17 +47,18 @@ export default function SignUp() {
       });
 
       const user = userCredential.user;
-      const { password: _password, ...formDataCopy } = formData;
 
       await setDoc(doc(db, "users", user.uid), {
-        ...formDataCopy,
+        name,
+        email,
         timestamp: serverTimestamp(),
       });
 
       toast.success("Registration successful");
       navigate("/");
     } catch (error) {
-      toast.error("Something went wrong with registration");
+      console.error(error);
+      toast.error(authErrorMessage(error, "Something went wrong with registration"));
     }
   }
 
@@ -77,39 +79,45 @@ export default function SignUp() {
               className="w-full px-4 py-2 text-xl text-gray-700 bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded transition ease-in-out duration-200 mb-6"
               type="text"
               placeholder="Full name"
+              aria-label="Full name"
               id="name"
               value={name}
               onChange={onChange}
+              required
+              minLength={2}
             />
             <input
               className="w-full px-4 py-2 text-xl text-gray-700 bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded transition ease-in-out duration-200 mb-6"
               type="email"
               placeholder="Email address"
+              aria-label="Email address"
               id="email"
               value={email}
               onChange={onChange}
+              required
             />
-            <div className="relative mb-6">
+            <div className="relative mb-1">
               <input
                 className="w-full px-4 py-2 text-xl text-gray-700 bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded transition ease-in-out duration-200"
                 type={showPassword ? "text" : "password"}
                 placeholder="Password"
+                aria-label="Password"
                 id="password"
                 value={password}
                 onChange={onChange}
+                required
+                minLength={6}
               />
-              {showPassword ? (
-                <AiFillEyeInvisible
-                  className="absolute right-3 top-3 text-xl cursor-pointer"
-                  onClick={() => setShowPassword((prev) => !prev)}
-                />
-              ) : (
-                <AiFillEye
-                  className="absolute right-3 top-3 text-xl cursor-pointer"
-                  onClick={() => setShowPassword((prev) => !prev)}
-                />
-              )}
+              <button
+                type="button"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute right-3 top-3 text-xl cursor-pointer"
+              >
+                {showPassword ? <AiFillEyeInvisible /> : <AiFillEye />}
+              </button>
             </div>
+            <p className="text-xs text-gray-500 mb-6">At least 6 characters.</p>
             <div className="flex justify-between whitespace-nowrap text-sm sm:text-lg">
               <p className="mb-6">
                 Already have an account?{" "}

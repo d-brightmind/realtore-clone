@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router';
 import OAuth from '../components/OAuth';
 import { getAuth, sendPasswordResetEmail } from 'firebase/auth';
 import { toast } from 'react-toastify';
+import { authErrorMessage } from '../utils/authErrorMessage';
 
 export default function ForgotPassword() {
   const navigate = useNavigate();
@@ -20,7 +21,8 @@ export default function ForgotPassword() {
       toast.success("Email was sent");
       navigate("/sign-in");
     } catch (error) {
-      toast.error("Could not send reset password");
+      console.error(error);
+      toast.error(authErrorMessage(error, "Could not send reset password"));
     }
   }
 
@@ -41,9 +43,11 @@ export default function ForgotPassword() {
               className="w-full px-4 py-2 text-xl text-gray-700 bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded transition ease-in-out duration-200 mb-6"
               type="email"
               placeholder="Email address"
+              aria-label="Email address"
               id="email"
               value={email}
               onChange={onChange}
+              required
             />
             <div className="flex justify-between whitespace-nowrap text-sm sm:text-lg">
               <p className="mb-6">

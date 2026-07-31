@@ -15,7 +15,7 @@ import {
   updateDoc,
   Timestamp,
 } from "firebase/firestore";
-import type { WithFieldValue } from "firebase/firestore";
+import type { DocumentReference, WithFieldValue } from "firebase/firestore";
 import { db } from "../firebase";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -53,8 +53,6 @@ interface StoredListing {
   offer: boolean;
   regularPrice: number;
   discountedPrice?: number;
-  latitude: number;
-  longitude: number;
   imgUrls: string[];
   geolocation: GeolocationData;
   timestamp: Timestamp;
@@ -84,7 +82,7 @@ export default function EditListing() {
   const auth = getAuth();
   const params = useParams<{ listingId: string }>();
   const geolocationEnabled = false;
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
   const [listing, setListing] = useState<StoredListing | null>(null);
   const [formData, setFormData] = useState<FormData>({
     type: "rent",
@@ -110,40 +108,46 @@ export default function EditListing() {
   } = formData;
 
   useEffect(() => {
-    if (listing && listing.userRef !== auth.currentUser!.uid) {
+    if (listing && listing.userRef !== auth.currentUser?.uid) {
       toast.error("You can't edit this listing");
       navigate("/");
     }
-  }, [auth.currentUser, listing, navigate]);
+  }, [auth.currentUser?.uid, listing, navigate]);
 
   useEffect(() => {
-    setLoading(true);
     async function fetchListing(): Promise<void> {
-      const docRef = doc(db, "listings", params.listingId!);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data() as StoredListing;
-        setListing(data);
-        setFormData({
-          type: data.type,
-          name: data.name,
-          bedrooms: data.bedrooms,
-          bathrooms: data.bathrooms,
-          parking: data.parking,
-          furnished: data.furnished,
-          address: data.address,
-          description: data.description,
-          offer: data.offer,
-          regularPrice: data.regularPrice,
-          discountedPrice: data.discountedPrice ?? 0,
-          latitude: data.latitude,
-          longitude: data.longitude,
-          images: null,
-        });
-        setLoading(false);
-      } else {
+      try {
+        const docRef = doc(db, "listings", params.listingId!);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data() as StoredListing;
+          setListing(data);
+          setFormData({
+            type: data.type,
+            name: data.name,
+            bedrooms: data.bedrooms,
+            bathrooms: data.bathrooms,
+            parking: data.parking,
+            furnished: data.furnished,
+            address: data.address,
+            description: data.description,
+            offer: data.offer,
+            regularPrice: data.regularPrice,
+            discountedPrice: data.discountedPrice ?? 0,
+            latitude: data.geolocation.lat,
+            longitude: data.geolocation.lng,
+            images: null,
+          });
+        } else {
+          navigate("/");
+          toast.error("Listing does not exist");
+        }
+      } catch (error) {
+        console.error(error);
+        toast.error("Could not load this listing");
         navigate("/");
-        toast.error("Listing does not exist");
+      } finally {
+        setLoading(false);
       }
     }
     fetchListing();
@@ -184,10 +188,7 @@ export default function EditListing() {
 
       uploadTask.on(
         "state_changed",
-        (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          console.log(`Upload is ${progress.toFixed(1)}% done`);
-        },
+        undefined,
         reject,
         () => getDownloadURL(uploadTask.snapshot.ref).then(resolve)
       );
@@ -197,6 +198,12 @@ export default function EditListing() {
   async function onSubmit(e: React.FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
     setLoading(true);
+
+    if (listing?.userRef !== auth.currentUser?.uid) {
+      setLoading(false);
+      toast.error("You can't edit this listing");
+      return;
+    }
 
     if (offer && discountedPrice >= regularPrice) {
       setLoading(false);
@@ -210,20 +217,38 @@ export default function EditListing() {
       return;
     }
 
+    if (images) {
+      const invalidImage = [...images].find(
+        (image) => !image.type.startsWith("image/") || image.size > 2 * 1024 * 1024
+      );
+      if (invalidImage) {
+        setLoading(false);
+        toast.error("Images must be image files under 2MB");
+        return;
+      }
+    }
+
     let geolocation: GeolocationData = { lat: 0, lng: 0 };
 
     if (geolocationEnabled) {
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?address=${address}&key=${import.meta.env.VITE_GEOCODE_API_KEY}`
-      );
-      const data = await response.json();
+      try {
+        const response = await fetch(
+          `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${import.meta.env.VITE_GEOCODE_API_KEY}`
+        );
+        const data = await response.json();
 
-      geolocation.lat = data.results[0]?.geometry.location.lat ?? 0;
-      geolocation.lng = data.results[0]?.geometry.location.lng ?? 0;
+        if (data.status === "ZERO_RESULTS" || !data.results?.[0]) {
+          setLoading(false);
+          toast.error("Please enter a correct address");
+          return;
+        }
 
-      if (data.status === "ZERO_RESULTS") {
+        geolocation.lat = data.results[0].geometry.location.lat ?? 0;
+        geolocation.lng = data.results[0].geometry.location.lng ?? 0;
+      } catch (error) {
+        console.error(error);
         setLoading(false);
-        toast.error("Please enter a correct address");
+        toast.error("Could not look up address location");
         return;
       }
     } else {
@@ -262,8 +287,8 @@ export default function EditListing() {
       userRef: auth.currentUser!.uid,
     };
 
-    const docRef = doc(db, "listings", params.listingId!);
-    await updateDoc(docRef, updatedListing as any);
+    const docRef = doc(db, "listings", params.listingId!) as DocumentReference<ListingDocument, ListingDocument>;
+    await updateDoc(docRef, updatedListing);
     setLoading(false);
     toast.success("Listing updated");
     navigate(`/category/${updatedListing.type}/${docRef.id}`);
@@ -294,7 +319,7 @@ export default function EditListing() {
             Rent
           </button>
         </div>
-        <p className="text-lg mt-6 font-semibold">Name</p>
+        <label htmlFor="name" className="text-lg mt-6 font-semibold block">Name</label>
         <input
           type="text" id="name" value={name} onChange={onChange}
           placeholder="Name" maxLength={32} minLength={10} required
@@ -302,7 +327,7 @@ export default function EditListing() {
         />
         <div className="flex space-x-6 mb-6">
           <div>
-            <p className="text-lg font-semibold">Beds</p>
+            <label htmlFor="bedrooms" className="text-lg font-semibold block">Beds</label>
             <input
               type="number" id="bedrooms" value={bedrooms} onChange={onChange}
               min={1} max={50} required
@@ -310,7 +335,7 @@ export default function EditListing() {
             />
           </div>
           <div>
-            <p className="text-lg font-semibold">Baths</p>
+            <label htmlFor="bathrooms" className="text-lg font-semibold block">Baths</label>
             <input
               type="number" id="bathrooms" value={bathrooms} onChange={onChange}
               min={1} max={50} required
@@ -356,7 +381,7 @@ export default function EditListing() {
             No
           </button>
         </div>
-        <p className="text-lg mt-6 font-semibold">Address</p>
+        <label htmlFor="address" className="text-lg mt-6 font-semibold block">Address</label>
         <textarea
           id="address" value={address} onChange={onChange}
           placeholder="Address" required
@@ -365,7 +390,7 @@ export default function EditListing() {
         {!geolocationEnabled && (
           <div className="flex space-x-6 justify-start mb-6">
             <div>
-              <p className="text-lg font-semibold">Latitude</p>
+              <label htmlFor="latitude" className="text-lg font-semibold block">Latitude</label>
               <input
                 type="number" id="latitude" value={latitude} onChange={onChange}
                 required min={-90} max={90}
@@ -373,7 +398,7 @@ export default function EditListing() {
               />
             </div>
             <div>
-              <p className="text-lg font-semibold">Longitude</p>
+              <label htmlFor="longitude" className="text-lg font-semibold block">Longitude</label>
               <input
                 type="number" id="longitude" value={longitude} onChange={onChange}
                 required min={-180} max={180}
@@ -382,7 +407,7 @@ export default function EditListing() {
             </div>
           </div>
         )}
-        <p className="text-lg font-semibold">Description</p>
+        <label htmlFor="description" className="text-lg font-semibold block">Description</label>
         <textarea
           id="description" value={description} onChange={onChange}
           placeholder="Description" required
@@ -409,7 +434,7 @@ export default function EditListing() {
         </div>
         <div className="flex items-center mb-6">
           <div className="w-full">
-            <p className="text-lg font-semibold">Regular price</p>
+            <label htmlFor="regularPrice" className="text-lg font-semibold block">Regular price</label>
             <div className="flex w-full justify-center items-center space-x-6">
               <input
                 type="number" id="regularPrice" value={regularPrice} onChange={onChange}
@@ -425,7 +450,7 @@ export default function EditListing() {
         {offer && (
           <div className="flex items-center mb-6">
             <div className="w-full">
-              <p className="text-lg font-semibold">Discounted price</p>
+              <label htmlFor="discountedPrice" className="text-lg font-semibold block">Discounted price</label>
               <div className="flex w-full justify-center items-center space-x-6">
                 <input
                   type="number" id="discountedPrice" value={discountedPrice} onChange={onChange}
@@ -440,7 +465,7 @@ export default function EditListing() {
           </div>
         )}
         <div className="mb-6">
-          <p className="text-lg font-semibold">Images</p>
+          <label htmlFor="images" className="text-lg font-semibold block">Images</label>
           <p className="text-gray-600">
             The first image will be the cover (max 6). Leave empty to keep existing images.
           </p>

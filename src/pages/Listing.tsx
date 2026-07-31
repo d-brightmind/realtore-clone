@@ -1,6 +1,7 @@
 import { doc, getDoc, Timestamp } from "firebase/firestore";
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
+import { toast } from "react-toastify";
 import Spinner from "../components/Spinner";
 import { db } from "../firebase";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -17,6 +18,7 @@ import {
 import { getAuth } from "firebase/auth";
 import Contact from "../components/Contact";
 import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
 
 export interface Listing {
   name: string;
@@ -45,15 +47,25 @@ export default function Listing() {
   const auth = getAuth();
   const [listing, setListing] = useState<Listing | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [notFound, setNotFound] = useState<boolean>(false);
   const [shareLinkCopied, setShareLinkCopied] = useState<boolean>(false);
   const [contactLandlord, setContactLandlord] = useState<boolean>(false);
 
   useEffect(() => {
     async function fetchListing(): Promise<void> {
-      const docRef = doc(db, "listings", params.listingId!);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        setListing(docSnap.data() as Listing);
+      try {
+        const docRef = doc(db, "listings", params.listingId!);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setListing(docSnap.data() as Listing);
+        } else {
+          setNotFound(true);
+        }
+      } catch (error) {
+        console.error(error);
+        toast.error("Could not load this listing");
+        setNotFound(true);
+      } finally {
         setLoading(false);
       }
     }
@@ -61,7 +73,23 @@ export default function Listing() {
   }, [params.listingId]);
 
   if (loading) return <Spinner />;
-  if (!listing) return null;
+
+  if (notFound || !listing) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] px-4 text-center">
+        <h1 className="text-2xl font-bold mb-3">Listing not found</h1>
+        <p className="text-gray-600 mb-6">
+          This listing may have been removed or the link is incorrect.
+        </p>
+        <Link
+          to="/"
+          className="px-7 py-3 bg-blue-600 text-white rounded text-sm uppercase shadow-md hover:bg-blue-700"
+        >
+          Back to home
+        </Link>
+      </div>
+    );
+  }
 
   const displayPrice =
     listing.offer && listing.discountedPrice != null
@@ -85,18 +113,18 @@ export default function Listing() {
       >
         {listing.imgUrls.map((url, index) => (
           <SwiperSlide key={index}>
-            <div
-              className="relative w-full overflow-hidden h-75"
-              style={{
-                background: `url(${url}) center no-repeat`,
-                backgroundSize: "cover",
-              }}
+            <img
+              src={url}
+              alt={`${listing.name} photo ${index + 1}`}
+              className="w-full overflow-hidden h-75 object-cover"
             />
           </SwiperSlide>
         ))}
       </Swiper>
 
-      <div
+      <button
+        type="button"
+        aria-label="Copy share link"
         className="fixed top-[13%] right-[3%] z-10 bg-white cursor-pointer border-2 border-gray-400 rounded-full w-12 h-12 flex justify-center items-center"
         onClick={() => {
           navigator.clipboard.writeText(window.location.href);
@@ -105,7 +133,7 @@ export default function Listing() {
         }}
       >
         <FaShare className="text-lg text-slate-500" />
-      </div>
+      </button>
 
       {shareLinkCopied && (
         <p className="fixed top-[23%] right-[5%] font-semibold border-2 border-gray-400 rounded-md bg-white z-10 p-2">

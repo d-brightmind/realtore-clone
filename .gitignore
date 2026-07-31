@@ -27,3 +27,7 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+
+# Firebase Admin service account key (used by scripts/seed.ts) — never commit this
+serviceAccountKey.json
+*serviceAccountKey*.json

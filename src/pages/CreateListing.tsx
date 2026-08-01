@@ -56,7 +56,7 @@ interface ListingDocument {
 export default function CreateListing() {
   const navigate = useNavigate();
   const auth = getAuth();
-  const [geolocationEnabled] = useState<boolean>(false);
+  const [geolocationEnabled] = useState<boolean>(true);
   const [loading, setLoading] = useState<boolean>(false);
   const [formData, setFormData] = useState<FormData>({
     type: "rent",

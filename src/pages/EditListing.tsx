@@ -81,7 +81,7 @@ export default function EditListing() {
   const navigate = useNavigate();
   const auth = getAuth();
   const params = useParams<{ listingId: string }>();
-  const geolocationEnabled = false;
+  const geolocationEnabled = true;
   const [loading, setLoading] = useState<boolean>(true);
   const [listing, setListing] = useState<StoredListing | null>(null);
   const [formData, setFormData] = useState<FormData>({
